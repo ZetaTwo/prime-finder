@@ -49,7 +49,7 @@ fn main() -> Result<()> {
         .arg(
             Arg::with_name("prime_size")
                 .short("s")
-                .long("prime_size")
+                .long("prime-size")
                 .value_name("SIZE")
                 .help("Sets the size in bytes of the prime numbers to search for")
                 .required(true)
@@ -58,13 +58,13 @@ fn main() -> Result<()> {
         .arg(
             Arg::with_name("dump_primes")
                 .short("p")
-                .long("dump_primes")
+                .long("dump-primes")
                 .help("Prints all primes without verifying P*Q"),
         )
         .arg(
             Arg::with_name("null_filter_length")
                 .short("f")
-                .long("null_filter_length")
+                .long("null-filter-length")
                 .value_name("LENGTH")
                 .help("Filters out any primes with a sequence of null bytes this long")
                 .required(true)
