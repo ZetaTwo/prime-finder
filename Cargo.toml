@@ -1,0 +1,23 @@
+[package]
+name = "prime-finder"
+version = "0.1.0"
+authors = ["Calle Svensson <calle.svensson@zeta-two.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+itertools = "0.10.0"
+iterslide = "1.0.1"
+hex = "0.4.3"
+rayon = "1.5.0"
+clap = "2.33.3"
+
+[dependencies.rug]
+version = "1.12.0"
+default-features = false
+features = ["integer"]
+
+[dependencies.indicatif]
+version = "0.15.0"
+features = ["rayon"]
