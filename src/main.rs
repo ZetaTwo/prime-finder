@@ -1,5 +1,3 @@
-#![feature(try_trait)]
-
 use {
     aho_corasick::AhoCorasick,
     clap::{App, Arg},
@@ -12,44 +10,10 @@ use {
         Integer,
     },
     simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode},
-    std::{collections::HashMap, convert::TryInto, fmt, fs::read},
+    std::{collections::HashMap, convert::TryInto, fs::read},
 };
 
-#[derive(Debug, Clone)]
-struct FindPrimeError;
-
-type Result<T> = std::result::Result<T, FindPrimeError>;
-
-impl fmt::Display for FindPrimeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Error while executing program")
-    }
-}
-
-//TODO: Specify error message from errors
-impl From<std::io::Error> for FindPrimeError {
-    fn from(_err: std::io::Error) -> FindPrimeError {
-        FindPrimeError {}
-    }
-}
-impl From<std::num::ParseIntError> for FindPrimeError {
-    fn from(_err: std::num::ParseIntError) -> FindPrimeError {
-        FindPrimeError {}
-    }
-}
-impl From<std::option::NoneError> for FindPrimeError {
-    fn from(_err: std::option::NoneError) -> FindPrimeError {
-        FindPrimeError {}
-    }
-}
-
-impl From<log::SetLoggerError> for FindPrimeError {
-    fn from(_err: log::SetLoggerError) -> FindPrimeError {
-        FindPrimeError {}
-    }
-}
-
-fn main() -> Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     CombinedLogger::init(vec![TermLogger::new(
         LevelFilter::Info,
         Config::default(),
@@ -99,7 +63,7 @@ fn main() -> Result<()> {
         .value_of("prime_size")
         .unwrap_or("128")
         .parse::<usize>()?;
-    let file_name = matches.value_of("FILE")?;
+    let file_name = matches.value_of("FILE").unwrap();
 
     let null_filter_length = matches
         .value_of("null_filter_length")
