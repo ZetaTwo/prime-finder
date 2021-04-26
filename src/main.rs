@@ -78,13 +78,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .par_windows(prime_size)
         .progress_count(bar_size)
         .filter(|window| {
-            match window
+            window
                 .windows(null_filter_length)
                 .find(|&sub_window| sub_window.iter().all(|&b| b == 0))
-            {
-                None => true,
-                Some(_) => false,
-            }
+                .is_none()
         })
         .flat_map(|window| {
             vec![
