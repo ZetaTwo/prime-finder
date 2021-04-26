@@ -3,7 +3,7 @@ use {
     clap::{App, Arg},
     indicatif::{ParallelProgressIterator, ProgressIterator},
     itertools::Itertools,
-    log::info,
+    log::{info, warn},
     rayon::{iter::IntoParallelIterator, iter::ParallelIterator, slice::ParallelSlice},
     rug::{
         integer::{IsPrime, Order},
@@ -12,6 +12,8 @@ use {
     simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode},
     std::{collections::HashMap, convert::TryInto, fs::read},
 };
+
+const PRIMES_WARNING_THRESHOLD: usize = 1_000;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     CombinedLogger::init(vec![TermLogger::new(
@@ -101,6 +103,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let primes: Vec<_> = probably_primes.collect();
     info!("Found {} prime candidates", primes.len());
+    if primes.len() > PRIMES_WARNING_THRESHOLD {
+        warn!("A large number of candidate primes found. This will consume a large amount of memory. Consider lowering the -f parameter")
+    }
 
     if dump_primes {
         println!("Primes in file");
