@@ -1,15 +1,18 @@
 #![feature(try_trait)]
 
 use {
+    aho_corasick::AhoCorasick,
     clap::{App, Arg},
     indicatif::{ParallelProgressIterator, ProgressIterator},
     itertools::Itertools,
-    rayon::{iter::ParallelIterator, slice::ParallelSlice},
+    log::info,
+    rayon::{iter::IntoParallelIterator, iter::ParallelIterator, slice::ParallelSlice},
     rug::{
         integer::{IsPrime, Order},
         Integer,
     },
-    std::{convert::TryInto, fmt, fs::read},
+    simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode},
+    std::{collections::HashMap, convert::TryInto, fmt, fs::read},
 };
 
 #[derive(Debug, Clone)]
@@ -40,7 +43,20 @@ impl From<std::option::NoneError> for FindPrimeError {
     }
 }
 
+impl From<log::SetLoggerError> for FindPrimeError {
+    fn from(_err: log::SetLoggerError) -> FindPrimeError {
+        FindPrimeError {}
+    }
+}
+
 fn main() -> Result<()> {
+    CombinedLogger::init(vec![TermLogger::new(
+        LevelFilter::Info,
+        Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )])?;
+
     //TODO: add start/end command line arguments
     let matches = App::new("prime-finder")
         .version("0.1")
@@ -85,16 +101,15 @@ fn main() -> Result<()> {
         .parse::<usize>()?;
     let file_name = matches.value_of("FILE")?;
 
-    //let file_contents = &read("core.ssh-agent.15")?[..200000]; // Faster testing
     let null_filter_length = matches
         .value_of("null_filter_length")
         .unwrap_or("2")
         .parse::<usize>()?;
-    let file_contents = read(file_name)?; //TODO: input file as argument
+    let file_contents = read(file_name)?;
 
     let bar_size = (file_contents.len() - prime_size).try_into().unwrap();
 
-    println!("Finding candidate primes");
+    info!("Finding candidate primes");
     let probably_primes = file_contents
         .par_windows(prime_size)
         .progress_count(bar_size)
@@ -106,10 +121,14 @@ fn main() -> Result<()> {
                 None => true,
                 Some(_) => false,
             }
-        }) /*.flat_map( | window | {
-            [Integer::from_digits(window, Order::Msf), Integer::from_digits(window, Order::Lsf)].iter() //TODO: Add both LE and BE
-        })*/
-        .map(|window| Integer::from_digits(window, Order::Lsf))
+        })
+        .flat_map(|window| {
+            vec![
+                Integer::from_digits(window, Order::Msf),
+                Integer::from_digits(window, Order::Lsf),
+            ]
+            .into_par_iter()
+        })
         .filter_map(|number| match number.is_probably_prime(1) {
             IsPrime::Yes | IsPrime::Probably => Some(number),
             IsPrime::No => None,
@@ -120,36 +139,48 @@ fn main() -> Result<()> {
         });
 
     let primes: Vec<_> = probably_primes.collect();
+    info!("Found {} prime candidates", primes.len());
 
     if dump_primes {
-        primes.iter().for_each(|prime| println!("{}", prime));
+        println!("Primes in file");
+        for prime in primes {
+            println!("{}", prime);
+        }
     } else {
-        println!("Validating candidates");
-        // TODO: Warning, this is O(n^2) algorithmic sin
-        let valid_primes: Vec<_> = primes
+        info!("Construct N candidates");
+        //TODO: Warning: consumes a lot of memory
+        let pqn_tuples: HashMap<_, _> = primes
             .iter()
             .cartesian_product(primes.iter())
-            .progress()
-            .map(|(p, q)| (p, q, Integer::from(p * q)))
-            .filter(|(p, q, n)| {
-                if q >= p {
-                    return false;
-                }
-                let nbytes = n.to_digits::<u8>(Order::LsfBe);
-                match file_contents
-                    .windows(nbytes.len())
-                    .find(|&window| nbytes == window || nbytes.iter().rev().eq(window))
-                {
-                    None => false,
-                    Some(_) => true,
+            .filter(|(p, q)| p <= q)
+            .flat_map(|(p, q)| {
+                vec![
+                    (Integer::from(p * q).to_digits::<u8>(Order::Lsf), (p, q)),
+                    (Integer::from(p * q).to_digits::<u8>(Order::Msf), (p, q)),
+                ]
+                .into_iter()
+            })
+            .collect();
+
+        info!("Building search");
+        let ac = AhoCorasick::new(pqn_tuples.keys().progress());
+        info!("Validating candidates");
+        let valid_primes: Vec<_> = ac
+            .find_iter(&file_contents)
+            .filter_map(|mat| {
+                let nbytes = &file_contents[mat.start()..mat.end()];
+                match pqn_tuples.get::<[u8]>(nbytes) {
+                    None => None,
+                    Some(pq) => Some(pq),
                 }
             })
             .collect();
 
-        println!("Primes in file");
-        valid_primes.iter().for_each(|(p, q, n)| {
+        println!("Validated primes in file");
+        for (p, q) in valid_primes {
+            let n = Integer::from(*p * *q);
             println!("P:{} Q:{} N:{}", p, q, n);
-        });
+        }
     }
     Ok(())
 }

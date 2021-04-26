@@ -7,11 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-itertools = "0.10.0"
-iterslide = "1.0.1"
-hex = "0.4.3"
-rayon = "1.5.0"
+aho-corasick = "0.7"
 clap = "2.33.3"
+hex = "0.4.3"
+iterslide = "1.0.1"
+itertools = "0.10.0"
+log = "0.4"
+rayon = "1.5.0"
+simplelog = "0.10.0"
 
 [dependencies.rug]
 version = "1.12.0"
