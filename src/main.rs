@@ -1,5 +1,4 @@
 use {
-    aho_corasick::AhoCorasick,
     clap::{App, Arg},
     indicatif::{ParallelProgressIterator, ProgressIterator},
     itertools::Itertools,
@@ -10,7 +9,9 @@ use {
         Integer,
     },
     simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode},
-    std::{collections::HashMap, convert::TryInto, fs::read},
+    std::{
+        collections::HashMap, convert::TryInto, fs::read,
+    },
 };
 
 const PRIMES_WARNING_THRESHOLD: usize = 1_000;
@@ -79,6 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let probably_primes = file_contents
         .par_windows(prime_size)
         .progress_count(bar_size)
+        // Discard candidates containing too long streaks of 0 bits
         .filter(|window| {
             window
                 .windows(null_filter_length)
@@ -114,10 +116,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     } else {
         info!("Construct N candidates");
-        //TODO: Warning: consumes a lot of memory
         let pqn_tuples: HashMap<_, _> = primes
             .iter()
             .cartesian_product(primes.iter())
+            .progress()
             .filter(|(p, q)| p <= q)
             .flat_map(|(p, q)| {
                 vec![
@@ -128,18 +130,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect();
 
-        info!("Building search");
-        let ac = AhoCorasick::new(pqn_tuples.keys().progress());
-        info!("Validating candidates");
-        let valid_primes: Vec<_> = ac
-            .find_iter(&file_contents)
-            .filter_map(|mat| {
-                let nbytes = &file_contents[mat.start()..mat.end()];
-                match pqn_tuples.get::<[u8]>(nbytes) {
-                    None => None,
-                    Some(pq) => Some(pq),
-                }
-            })
+        info!("Search for composites in file");
+        let valid_primes: Vec<&(&Integer, &Integer)> = file_contents
+            .par_windows(prime_size * 2)
+            .progress_count(bar_size)
+            .filter_map(|window| { pqn_tuples.get(window) })
             .collect();
 
         println!("Validated primes in file");
