@@ -12,6 +12,8 @@ itertools = "0.10.0"
 log = "0.4"
 rayon = "1.5.0"
 simplelog = "0.10.0"
+aho-corasick = "0.7.18"
+cdc = "0.1.0"
 
 [dependencies.rug]
 version = "1.12.0"

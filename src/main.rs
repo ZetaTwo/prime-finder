@@ -1,4 +1,6 @@
 use {
+    aho_corasick::AhoCorasick,
+    cdc::{Polynom64, Rabin64, RollingHash64, SeparatorIter},
     clap::{App, Arg},
     indicatif::{ParallelProgressIterator, ProgressIterator},
     itertools::Itertools,
@@ -9,12 +11,70 @@ use {
         Integer,
     },
     simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode},
-    std::{
-        collections::HashMap, convert::TryInto, fs::read,
-    },
+    std::{collections::HashMap, convert::TryInto, fs::read},
 };
 
 const PRIMES_WARNING_THRESHOLD: usize = 1_000;
+
+// ./target/release/prime-finder -f 4 -s 128 core.ssh-agent.15  82.91s user 22.79s system 130% cpu 1:20.71 total
+fn finder_sliding_window<'a>(
+    pqn_tuples: &'a HashMap<Vec<u8>, (&Integer, &Integer)>,
+    file_contents: &[u8],
+    prime_size: usize,
+) -> Vec<&'a (&'a Integer, &'a Integer)> {
+    let bar_size = (file_contents.len() - prime_size).try_into().unwrap();
+
+    info!("Search for composites in file");
+    file_contents
+        .par_windows(prime_size * 2)
+        .progress_count(bar_size)
+        .filter_map(|window| pqn_tuples.get(window))
+        .collect()
+}
+
+fn finder_aho_corasick<'a>(
+    pqn_tuples: &'a HashMap<Vec<u8>, (&Integer, &Integer)>,
+    file_contents: &[u8],
+    _prime_size: usize,
+) -> Vec<&'a (&'a Integer, &'a Integer)> {
+    let composites = pqn_tuples.keys();
+    let ac = AhoCorasick::new(composites);
+
+    info!("Search for composites in file");
+    ac.find_iter(file_contents)
+        .flat_map(|m| pqn_tuples.get(&file_contents[m.start()..m.end()]))
+        .collect()
+}
+
+// ./target/release/prime-finder -f 4 -s 128 core.ssh-agent.15  70.59s user 11.57s system 137% cpu 59.732 total
+fn finder_rabin_karp<'a>(
+    pqn_tuples: &'a HashMap<Vec<u8>, (&Integer, &Integer)>,
+    file_contents: &[u8],
+    prime_size: usize,
+) -> Vec<&'a (&'a Integer, &'a Integer)> {
+    let bit_size = 8; /*(2*prime_size*8).try_into().unwrap();*/
+    let mut hasher = Rabin64::new(bit_size);
+    let rabin_pqn_tuples: HashMap<Polynom64, &(&Integer, &Integer)> = pqn_tuples
+        .iter()
+        .map(|(k, v)| {
+            hasher.reset();
+            for b in k.iter() {
+                hasher.slide(b);
+            }
+            (*hasher.get_hash(), v)
+        })
+        .collect();
+
+    SeparatorIter::custom_new(file_contents.iter().cloned(), bit_size, |candidate_hash| {
+        rabin_pqn_tuples.contains_key(&candidate_hash)
+    })
+    .flat_map(|separator| {
+        pqn_tuples.get(
+            &file_contents[separator.index as usize - 2 * prime_size..(separator.index as usize)],
+        )
+    })
+    .collect()
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     CombinedLogger::init(vec![TermLogger::new(
@@ -130,12 +190,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect();
 
-        info!("Search for composites in file");
-        let valid_primes: Vec<&(&Integer, &Integer)> = file_contents
-            .par_windows(prime_size * 2)
-            .progress_count(bar_size)
-            .filter_map(|window| { pqn_tuples.get(window) })
-            .collect();
+        let valid_primes = finder_sliding_window(&pqn_tuples, &file_contents, prime_size); // Simple
+        //let valid_primes = finder_aho_corasick(&pqn_tuples, &file_contents, prime_size); // Memory expensive
+        //let valid_primes = finder_rabin_karp(&pqn_tuples, &file_contents, prime_size); // Slightly faster
 
         println!("Validated primes in file");
         for (p, q) in valid_primes {
