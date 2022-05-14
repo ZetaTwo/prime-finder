@@ -1,2 +1,4 @@
 /target
 core*
+perf.data
+perf.data.old

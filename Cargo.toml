@@ -1,16 +1,14 @@
 [package]
 name = "prime-finder"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Calle Svensson <calle.svensson@zeta-two.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 clap = "2.33.3"
 itertools = "0.10.0"
 log = "0.4"
-rayon = "1.5.0"
+rayon = "1.5"
 simplelog = "0.10.0"
 aho-corasick = "0.7.18"
 cdc = "0.1.0"
@@ -21,5 +19,9 @@ default-features = false
 features = ["integer"]
 
 [dependencies.indicatif]
-version = "0.15.0"
+version = "0.16.2"
 features = ["rayon"]
+
+# CARGO_PROFILE_RELEASE_DEBUG=true
+#[profile.release]
+#debug = true
