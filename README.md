@@ -4,7 +4,7 @@ This program searches a file for RSA primes, i.e. primes P & Q, where P*Q == N.
 
 Usage:
 ```
-prime-finder 0.1
+prime-finder 0.2
 Calle Svensson <calle.svensson@zeta-two.com>
 Finds RSA primes in files
 
