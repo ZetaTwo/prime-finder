@@ -5,16 +5,16 @@ authors = ["Calle Svensson <calle.svensson@zeta-two.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.33.3"
-itertools = "0.10.0"
-log = "0.4"
-rayon = "1.5"
-simplelog = "0.10.0"
+clap = "3.1.18"
+itertools = "0.10.3"
+log = "0.4.17"
+rayon = "1.5.3"
+simplelog = "0.12.0"
 aho-corasick = "0.7.18"
-cdc = "0.1.0"
+cdc = "0.1.1"
 
 [dependencies.rug]
-version = "1.12.0"
+version = "1.16.0"
 default-features = false
 features = ["integer"]
 

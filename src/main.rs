@@ -1,6 +1,6 @@
 use aho_corasick::AhoCorasick;
 use cdc::{Polynom64, Rabin64, RollingHash64, SeparatorIter};
-use clap::{App, Arg};
+use clap::{Command, Arg};
 use indicatif::ProgressBar;
 use indicatif::{ParallelProgressIterator, ProgressIterator};
 use itertools::Itertools;
@@ -24,7 +24,7 @@ fn finder_sliding_window<'a>(
     let bar_size = (file_contents.len() - prime_size).try_into().unwrap();
 
     let pb = ProgressBar::new(bar_size);
-    pb.set_draw_rate(4_000_000);
+    pb.set_draw_rate(4);
 
     info!("Search for composites in file");
     file_contents
@@ -46,7 +46,7 @@ fn finder_aho_corasick<'a>(
     let bar_size = (file_contents.len() - prime_size).try_into().unwrap();
 
     let pb = ProgressBar::new(bar_size);
-    pb.set_draw_rate(4_000_000);
+    pb.set_draw_rate(4);
 
     info!("Search for composites in file");
     ac.find_iter(file_contents)
@@ -67,7 +67,7 @@ fn finder_rabin_karp<'a>(
     let bar_size = (file_contents.len() - prime_size).try_into().unwrap();
 
     let pb = ProgressBar::new(bar_size);
-    pb.set_draw_rate(4_000_000);
+    pb.set_draw_rate(4);
 
     let rabin_pqn_tuples: HashMap<Polynom64, &(&Integer, &Integer)> = pqn_tuples
         .iter()
@@ -101,13 +101,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )])?;
 
     //TODO: add start/end command line arguments
-    let matches = App::new("prime-finder")
-        .version("0.1")
+    let matches = Command::new("prime-finder")
+        .version("0.2")
         .about("Finds RSA primes in files")
         .author("Calle Svensson <calle.svensson@zeta-two.com>")
         .arg(
-            Arg::with_name("prime_size")
-                .short("s")
+            Arg::new("prime_size")
+                .short('s')
                 .long("prime-size")
                 .value_name("SIZE")
                 .help("Sets the size in bytes of the prime numbers to search for")
@@ -115,14 +115,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("dump_primes")
-                .short("p")
+            Arg::new("dump_primes")
+                .short('p')
                 .long("dump-primes")
                 .help("Prints all primes without verifying P*Q"),
         )
         .arg(
-            Arg::with_name("null_filter_length")
-                .short("f")
+            Arg::new("null_filter_length")
+                .short('f')
                 .long("null-filter-length")
                 .value_name("LENGTH")
                 .help("Filters out any primes with a sequence of null bytes this long")
@@ -130,7 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("FILE")
+            Arg::new("FILE")
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1),
@@ -138,6 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get_matches();
 
     let dump_primes = matches.is_present("dump_primes");
+    // TODO: search for all reasonable sizes at the same time
     let prime_size = matches
         .value_of("prime_size")
         .unwrap_or("128")
@@ -193,14 +194,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     } else {
         info!("Construct N candidates");
+        let num_primes = primes.len();
         let pq_tuples = primes.iter().cartesian_product(primes.iter());
 
-        let pb = ProgressBar::new(0);
+        let pb = ProgressBar::new(((num_primes*num_primes)/2).try_into().unwrap());
         pb.set_draw_rate(4);
 
         let pqn_tuples: HashMap<_, _> = pq_tuples
-            .progress_with(pb)
             .filter(|(p, q)| p <= q)
+            .progress_with(pb)
             .flat_map(|(p, q)| {
                 vec![
                     (Integer::from(p * q).to_digits::<u8>(Order::Lsf), (p, q)),
